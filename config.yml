@@ -1,0 +1,154 @@
+server:
+  host: "0.0.0.0"
+  port: 5000
+
+local_backend:
+  openai_base_url: "http://localhost:9000/v1"
+  connect_timeout_seconds: 10.0
+  read_timeout_seconds: 300.0
+  health_check_timeout_seconds: 3.0
+
+models:
+  local:
+    - id: "gemma-4-26b"
+      display_name: "Gemma 4 26B QAT"
+      context_length: 65536
+    - id: "gemma-4-12b"
+      display_name: "Gemma 4 12B QAT"
+      context_length: 65536
+    - id: "qwen3.8-27b"
+      display_name: "Qwen 3.8 27B"
+      context_length: 65536
+
+router:
+  default_model: "auto"
+  system_prompt: ""
+
+presets:
+  - id: "auto"
+    display_name: "Auto"
+    routes:
+      - target: "local"
+        priority: 99
+        models:
+          - id: "qwen3.8-27b"
+            priority: 99
+          - id: "gemma-4-26b"
+            priority: 98
+          - id: "gemma-4-12b"
+            priority: 97
+      - target: "remote"
+        endpoint_id: "nvidia-nim"
+        priority: 98
+        models:
+          - id: "minimaxai/minimax-m3"
+            priority: 99
+          - id: "thinkingmachines/inkling"
+            priority: 98
+          - id: "stepfun-ai/step-3.7-flash"
+            priority: 97
+          - id: "poolside/laguna-xs-2.1"
+            priority: 96
+          - id: "nvidia/nemotron-3.5-lightning-30b-a3b"
+            priority: 95
+          - id: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+            priority: 94
+          - id: "nvidia/nemotron-nano-12b-v2-vl"
+            priority: 93
+  - id: "auto-multimodal"
+    display_name: "Auto Multimodal"
+    system_prompt: ""
+    routes:
+      - target: "local"
+        priority: 99
+        models:
+          - id: "qwen3.8-27b"
+            priority: 99
+          - id: "gemma-4-26b"
+            priority: 98
+          - id: "gemma-4-12b"
+            priority: 97
+      - target: "remote"
+        endpoint_id: "nvidia-nim"
+        priority: 98
+        models:
+          - id: "minimaxai/minimax-m3"
+            priority: 99
+          - id: "thinkingmachines/inkling"
+            priority: 98
+          - id: "stepfun-ai/step-3.7-flash"
+            priority: 97
+          - id: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+            priority: 96
+          - id: "nvidia/nemotron-nano-12b-v2-vl"
+            priority: 95
+  - id: "remote-multimodal"
+    display_name: "Remote Multimodal"
+    system_prompt: ""
+    routes:
+      - target: "remote"
+        endpoint_id: "nvidia-nim"
+        priority: 99
+        models:
+          - id: "minimaxai/minimax-m3"
+            priority: 99
+          - id: "thinkingmachines/inkling"
+            priority: 98
+          - id: "stepfun-ai/step-3.7-flash"
+            priority: 97
+          - id: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+            priority: 96
+          - id: "nvidia/nemotron-nano-12b-v2-vl"
+            priority: 95
+  - id: "remote"
+    display_name: "Remote"
+    routes:
+      - target: "remote"
+        endpoint_id: "nvidia-nim"
+        priority: 99
+        models:
+          - id: "minimaxai/minimax-m3"
+            priority: 99
+          - id: "thinkingmachines/inkling"
+            priority: 98
+          - id: "stepfun-ai/step-3.7-flash"
+            priority: 97
+          - id: "poolside/laguna-xs-2.1"
+            priority: 96
+          - id: "nvidia/nemotron-3.5-lightning-30b-a3b"
+            priority: 95
+          - id: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+            priority: 94
+          - id: "nvidia/nemotron-nano-12b-v2-vl"
+            priority: 93
+
+remote_endpoints:
+  - id: "nvidia-nim"
+    openai_base_url: "https://integrate.api.nvidia.com/v1"
+    authentication:
+      type: "bearer"
+      environment_variable: "NIM_API_KEY"
+    connect_timeout_seconds: 15.0
+    read_timeout_seconds: 300.0
+    models:
+      - id: "minimaxai/minimax-m3"
+        display_name: "MiniMax M3"
+        context_length: 1048576
+      - id: "thinkingmachines/inkling"
+        display_name: "Inkling"
+        context_length: 131072
+      - id: "stepfun-ai/step-3.7-flash"
+        display_name: "StepFun 3.7 Flash"
+        context_length: 262144
+      - id: "poolside/laguna-xs-2.1"
+        display_name: "Laguna XS 2.1"
+        context_length: 262144
+      - id: "nvidia/nemotron-3.5-lightning-30b-a3b"
+        display_name: "Nemotron 3.5 Lightning 30B A3B"
+        context_length: 1048576
+      - id: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+        display_name: "Nemotron 3 Nano Omni 30B A3B"
+        context_length: 262144
+      - id: "nvidia/nemotron-nano-12b-v2-vl"
+        display_name: "Nemotron Nano 12B v2 VL"
+        context_length: 131072
