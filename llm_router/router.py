@@ -189,7 +189,7 @@ class ModelRouter:
             except asyncio.TimeoutError:
                 continue
 
-            except Exception:
+            except (httpx.HTTPError, OSError):
                 continue
 
             if isinstance(result, AsyncIterator):

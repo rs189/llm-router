@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 import json
-import logging
 
 import httpx
 
@@ -24,7 +23,6 @@ class ValidatedStream:
         self._label = label
         self._response = response
         self._client = client
-        self._logger = logging.getLogger(__name__)
 
     async def create(self) -> AsyncIterator[bytes] | None:
         lines = self._response.aiter_lines()
@@ -32,11 +30,8 @@ class ValidatedStream:
             first_line = await anext(lines)
         except (StopAsyncIteration, httpx.HTTPError) as exception:
             await self._close()
-            self._logger.warning(
-                "%s stream failed before output: %s",
-                self._label,
-                exception,
-            )
+
+            print(f"WARNING: {self._label} stream failed before output: {exception}")
 
             return None
 
@@ -56,11 +51,7 @@ class ValidatedStream:
 
                 yield f"{line}\n".encode("utf-8")
         except httpx.HTTPError as exception:
-            self._logger.warning(
-                "%s stream failed after output: %s",
-                self._label,
-                exception,
-            )
+            print(f"WARNING: {self._label} stream failed after output: {exception}")
         finally:
             if not is_done:
                 yield SSE_CLEAN_STOP

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import os
 from collections.abc import AsyncIterator
 from typing import Any
@@ -14,7 +13,6 @@ from .stream import ValidatedStream
 
 class BackendClient:
     def __init__(self) -> None:
-        self._logger = logging.getLogger(__name__)
         self._clients: dict[str, httpx.AsyncClient] = {}
 
     async def close(self) -> None:
@@ -41,7 +39,8 @@ class BackendClient:
             response.raise_for_status()
             data = response.json()
         except (httpx.HTTPError, ValueError) as exception:
-            self._logger.info("Local health probe failed: %s", exception)
+            print(f"INFO: Local health probe failed: {exception}")
+
             return None
 
         if not isinstance(data, dict):
@@ -94,9 +93,9 @@ class BackendClient:
 
         credential = os.getenv(environment_variable, "").strip()
         if not credential:
-            self._logger.warning(
-                "%s credential environment variable is not configured",
-                endpoint.id or "local",
+            print(
+                f"WARNING: {endpoint.id or 'local'} credential "
+                "environment variable is not configured"
             )
 
             return None
@@ -155,11 +154,13 @@ class BackendClient:
             )
             response = await client.send(request, stream=True)
         except httpx.HTTPError as exception:
-            self._logger.warning("%s request failed: %s", label, exception)
+            print(f"WARNING: {label} request failed: {exception}")
+
             return None
 
         if response.is_error:
-            self._logger.warning("%s returned HTTP %s", label, response.status_code)
+            print(f"WARNING: {label} returned HTTP {response.status_code}")
+
             await response.aclose()
 
             return None
@@ -186,11 +187,12 @@ class BackendClient:
             response.raise_for_status()
             data = response.json()
         except (httpx.HTTPError, ValueError) as exception:
-            self._logger.warning("%s request failed: %s", label, exception)
+            print(f"WARNING: {label} request failed: {exception}")
+
             return None
 
         if not isinstance(data, dict) or not is_valid_completion(data):
-            self._logger.warning("%s returned an invalid completion", label)
+            print(f"WARNING: {label} returned an invalid completion")
 
             return None
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Final
 
@@ -32,7 +32,7 @@ class AuthenticationConfig:
 class EndpointConfig:
     id: str | None = None
     openai_base_url: str = ""
-    authentication: AuthenticationConfig = AuthenticationConfig()
+    authentication: AuthenticationConfig = field(default_factory=AuthenticationConfig)
     connect_timeout_seconds: float = 10.0
     read_timeout_seconds: float = 300.0
     attempt_timeout_seconds: float | None = None
@@ -268,9 +268,6 @@ class ConfigLoader:
 
         endpoint_ids = [endpoint.id for endpoint in endpoints]
         if len(set(endpoint_ids)) != len(endpoints):
-            raise ConfigError("Each endpoint id must be unique")
-
-        if len(endpoint_ids) != len(endpoints):
             raise ConfigError("Each endpoint id must be unique")
 
         all_model_ids = [
