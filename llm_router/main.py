@@ -15,6 +15,7 @@ def run() -> None:
         config = ConfigLoader().load(arguments.config)
     except ConfigError as exception:
         raise SystemExit(f"Configuration error: {exception}") from exception
+
     uvicorn.run(create_app(config), host=config.server.host, port=config.server.port)
 
 
@@ -26,6 +27,7 @@ def _parse_arguments() -> argparse.Namespace:
         default=Path("config.yml"),
         help="Path to the router YAML configuration file",
     )
+
     return parser.parse_args()
 
 

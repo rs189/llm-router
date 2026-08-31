@@ -7,7 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from .backend import BackendClient
-from .config import EndpointConfig, RouterConfig
+from .config import RouterConfig
 from .messages import normalize_messages
 from .router import ModelRouter
 from .state import RoutedModelRegistry
@@ -20,11 +20,16 @@ SWITCHED_BACKEND_HEADER = "x-router-is_switched"
 def create_app(config: RouterConfig) -> FastAPI:
     app = FastAPI(title="LLM Router")
     state = RoutedModelRegistry()
+    backend_client = BackendClient()
     model_router = ModelRouter(
         config,
-        BackendClient(config.local_backend),
+        backend_client,
         state,
     )
+
+    @app.on_event("shutdown")
+    async def shutdown() -> None:
+        await backend_client.close()
 
     @app.post("/v1/chat/completions")
     async def route_chat_completions(request: Request) -> Response:
@@ -32,21 +37,27 @@ def create_app(config: RouterConfig) -> FastAPI:
             body = await request.json()
         except ValueError:
             return _error(400, "Request body is not valid JSON")
+
         if not isinstance(body, dict):
             return _error(400, "Request body must be a JSON object")
+
         messages = body.get("messages")
         if not isinstance(messages, list) or not messages:
             return _error(400, "messages must be a non-empty array")
+
         body["messages"] = normalize_messages(messages)
         if not body["messages"]:
             return _error(400, "No valid messages remain after normalization")
+
         requested_model = str(
             body.get("model", config.default_model)
         ).strip().lower()
         routed = await model_router.route(body, requested_model)
         if routed is None:
             return _unavailable_response(config, requested_model)
+
         result, model, is_switched = routed
+
         return _success_response(config, result, model, is_switched)
 
     @app.get("/models")
@@ -76,6 +87,7 @@ def _success_response(
         headers[SWITCHED_BACKEND_HEADER] = "true"
     if isinstance(result, dict):
         return JSONResponse(content=result, headers=headers)
+
     return StreamingResponse(result, media_type="text/event-stream", headers=headers)
 
 
@@ -96,6 +108,7 @@ def _models_response(config: RouterConfig) -> dict[str, Any]:
         _model_record(model.id, "remote", model.context_length)
         for model in config.remote_models()
     )
+
     return {"object": "list", "data": records}
 
 
@@ -119,6 +132,7 @@ def _unavailable_response(config: RouterConfig, requested_model: str) -> JSONRes
         message = f"No configured route could serve preset {requested_model}"
     else:
         message = "All configured LLM backends failed before producing a response"
+
     return _error(503, message)
 
 

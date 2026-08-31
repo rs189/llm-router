@@ -8,8 +8,8 @@ import httpx
 
 
 SSE_CLEAN_STOP = (
-    b'data: {"id":"router-stream-stop","object":"chat.completion.chunk",'
-    b'"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\n'
+    b"data: {\"id\":\"router-stream-stop\",\"object\":\"chat.completion.chunk\","
+    b"\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n"
 )
 SSE_DONE = b"data: [DONE]\n\n"
 
@@ -28,45 +28,33 @@ class ValidatedStream:
 
     async def create(self) -> AsyncIterator[bytes] | None:
         lines = self._response.aiter_lines()
-        buffered: list[str] = []
-        has_output = False
-        is_done = False
         try:
-            async for line in lines:
-                buffered.append(line)
-                line_has_output, is_done = _parse_sse_line(line)
-                if line_has_output:
-                    has_output = True
-                if has_output or is_done:
-                    break
-        except httpx.HTTPError as exception:
+            first_line = await anext(lines)
+        except (StopAsyncIteration, httpx.HTTPError) as exception:
             await self._close()
             self._logger.warning(
                 "%s stream failed before output: %s",
                 self._label,
                 exception,
             )
+
             return None
 
-        if not has_output:
-            await self._close()
-            self._logger.warning("%s produced no stream output", self._label)
-            return None
-        return self._generate(buffered, lines, is_done)
+        return self._generate([first_line], lines)
 
     async def _generate(
         self,
         buffered: list[str],
         lines: AsyncIterator[str],
-        is_done: bool,
     ) -> AsyncIterator[bytes]:
+        is_done = False
         try:
             for line in buffered:
                 yield f"{line}\n".encode("utf-8")
-            if not is_done:
-                async for line in lines:
-                    _, is_done = _parse_sse_line(line)
-                    yield f"{line}\n".encode("utf-8")
+            async for line in lines:
+                _, is_done = _parse_sse_line(line)
+
+                yield f"{line}\n".encode("utf-8")
         except httpx.HTTPError as exception:
             self._logger.warning(
                 "%s stream failed after output: %s",
@@ -76,32 +64,38 @@ class ValidatedStream:
         finally:
             if not is_done:
                 yield SSE_CLEAN_STOP
+
                 yield SSE_DONE
             await self._close()
 
     async def _close(self) -> None:
         await self._response.aclose()
-        await self._client.aclose()
 
 
 def _parse_sse_line(line: str) -> tuple[bool, bool]:
     stripped = line.strip()
     if not stripped.startswith("data:"):
         return False, False
+
     payload = stripped.removeprefix("data:").strip()
     if payload == "[DONE]":
         return False, True
+
     try:
         data = json.loads(payload)
     except json.JSONDecodeError:
         return False, False
+
     choices = data.get("choices")
     if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
         return False, False
+
     delta = choices[0].get("delta")
     if not isinstance(delta, dict):
         return False, False
+
     output_fields = ("content", "reasoning", "reasoning_content", "refusal")
     has_text_output = any(delta.get(key) not in (None, "", []) for key in output_fields)
     has_tool_output = bool(delta.get("tool_calls") or delta.get("function_call"))
+
     return has_text_output or has_tool_output, False

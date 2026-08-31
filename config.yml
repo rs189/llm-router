@@ -130,6 +130,7 @@ remote_endpoints:
       environment_variable: "NIM_API_KEY"
     connect_timeout_seconds: 15.0
     read_timeout_seconds: 300.0
+    attempt_timeout_seconds: 8.0
     models:
       - id: "minimaxai/minimax-m3"
         display_name: "MiniMax M3"
